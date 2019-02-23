@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -11,8 +12,6 @@ import (
 )
 
 // TODO: split main.go for more readable file
-// TODO: code add route function
-// TODO: code add common_test create table function
 
 // Field embeddes information about table's field
 type Field struct {
@@ -43,6 +42,11 @@ var fieldsPrompt = []prompt.Suggest{
 	{Text: "date", Description: "Date"},
 }
 
+var yesNoPrompt = []prompt.Suggest{
+	{Text: "oui", Description: "Null possible"},
+	{Text: "non", Description: "Champ jamais nul"},
+}
+
 func emptyCompleter(in prompt.Document) []prompt.Suggest {
 	s := []prompt.Suggest{}
 	return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
@@ -50,6 +54,10 @@ func emptyCompleter(in prompt.Document) []prompt.Suggest {
 
 func fieldCompleter(in prompt.Document) []prompt.Suggest {
 	return prompt.FilterHasPrefix(fieldsPrompt, in.GetWordBeforeCursor(), true)
+}
+
+func yesNoCompleter(in prompt.Document) []prompt.Suggest {
+	return prompt.FilterHasPrefix(yesNoPrompt, in.GetWordBeforeCursor(), true)
 }
 
 func capitalizeFirst(s string) string {
@@ -111,12 +119,12 @@ func getFields() (*Table, error) {
 	table.Name = strings.TrimSpace(prompt.Input("Nom du modèle ? ", emptyCompleter,
 		prompt.OptionPrefixTextColor(prompt.Green)))
 	if table.Name == "" {
-		return nil, errors.New("Nom de table vide, arrêt de be_factory")
+		return nil, errors.New("Nom du modèle vide, arrêt de be_factory")
 	}
 	table.Name = capitalizeFirst(table.Name)
 	table.SQLName = toSQL(table.Name)
 	for table.FrenchName == "" {
-		table.FrenchName = prompt.Input("Nom français ? ", emptyCompleter,
+		table.FrenchName = prompt.Input("Nom français du modèle ? ", emptyCompleter,
 			prompt.OptionPrefixTextColor(prompt.Green))
 		if table.FrenchName == "" {
 			fmt.Println("Le nom français ne peut pas être vide")
@@ -124,15 +132,15 @@ func getFields() (*Table, error) {
 	}
 	table.FrenchName = capitalizeFirst(table.FrenchName)
 	var fields []Field
-	for {
-		fieldName := prompt.Input("Nom du champ ? ", emptyCompleter,
+	for i := 1; ; i++ {
+		fieldName := prompt.Input("  Nom du champ n°"+strconv.Itoa(i)+" ? ", emptyCompleter,
 			prompt.OptionPrefixTextColor(prompt.Yellow))
 		if fieldName == "" {
 			break
 		}
 		var fieldType string
 		for {
-			fieldType = prompt.Input("Type du champ "+fieldName+" ? ", fieldCompleter,
+			fieldType = prompt.Input("  Type du champ "+fieldName+" ? ", fieldCompleter,
 				prompt.OptionPrefixTextColor(prompt.Yellow))
 			err := validateField(fieldType)
 			if err == nil {
@@ -140,7 +148,18 @@ func getFields() (*Table, error) {
 			}
 			fmt.Println(err.Error())
 		}
-		fields = append(fields, Field{Name: fieldName, SQLType: fieldType})
+		var fieldNullable bool
+		for {
+			nullable := prompt.Input("  Le champ "+fieldName+" peut-il est null ? ", fieldCompleter,
+				prompt.OptionPrefixTextColor(prompt.Yellow))
+			if nullable != "o" && nullable != "O" && nullable != "n" && nullable != "N" && nullable != "oui" && nullable != "non" {
+				fmt.Println("  Oui ou non attendu")
+			} else {
+				fieldNullable = nullable == "o" || nullable == "O" || nullable == "oui"
+				break
+			}
+		}
+		fields = append(fields, Field{Name: fieldName, SQLType: fieldType, Nullable: fieldNullable})
 	}
 	if len(fields) == 0 {
 		return nil, errors.New("Aucun champ dans la table, arrêt de be_factory")
@@ -353,7 +372,6 @@ func createAction(t *Table) error {
 			return errors.New("Dossier actions inexistant, impossible de le créer")
 		}
 	}
-	fmt.Println("Nom du fichier " + t.SQLName + ".go")
 	file, err := os.Create("./actions/" + t.SQLName + ".go")
 	if err != nil {
 		return errors.New("Création du fichier models " + err.Error())
@@ -365,98 +383,97 @@ func createAction(t *Table) error {
 		return errors.New("Impossible de récupérer le chemin courant " + err.Error())
 	}
 	importPath := strings.Replace(path[len(srcGoPAth)+5:], "\\", "/", -1) + "/models"
-	fmt.Printf("Import %s: ", importPath)
 	content := `package actions
 
-	import (
-		"database/sql"
-		"net/http"
-	
-		"` + importPath + `"
-		"github.com/kataras/iris"
-	)
-	
-	type ` + t.SQLName + `Req struct {
-		` + t.Name + ` models.` + t.Name + ` ` + "`json:\"" + t.Name + "\"`" + `
+import (
+	"database/sql"
+	"net/http"
+
+	"` + importPath + `"
+	"github.com/kataras/iris"
+)
+
+type ` + t.SQLName + `Req struct {
+	` + t.Name + ` models.` + t.Name + ` ` + "`json:\"" + t.Name + "\"`" + `
+}
+
+// Create` + t.Name + ` handles the post request to create a new ` + t.SQLName + `
+func Create` + t.Name + `(ctx iris.Context) {
+	var req ` + t.SQLName + `Req
+	if err := ctx.ReadJSON(&req); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
+		return
 	}
-	
-	// Create` + t.Name + ` handles the post request to create a new ` + t.SQLName + `
-	func Create` + t.Name + `(ctx iris.Context) {
-		var req ` + t.SQLName + `Req
-		if err := ctx.ReadJSON(&req); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
-			return
-		}
-		if err := req.` + t.Name + `.Validate(); err != nil {
-			ctx.StatusCode(http.StatusBadRequest)
-			ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + ` : " + err.Error()})
-			return
-		}
-		db := ctx.Values().Get("db").(*sql.DB)
-		if err := req.` + t.Name + `.Create(db); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
-			return
-		}
-		ctx.StatusCode(http.StatusCreated)
-		ctx.JSON(req)
+	if err := req.` + t.Name + `.Validate(); err != nil {
+		ctx.StatusCode(http.StatusBadRequest)
+		ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + ` : " + err.Error()})
+		return
 	}
-	
-	// Update` + t.Name + ` handles the put request to modify a new ` + t.SQLName + `
-	func Update` + t.Name + `(ctx iris.Context) {
-		var req ` + t.SQLName + `Req
-		if err := ctx.ReadJSON(&req); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
-			return
-		}
-		if err := req.` + t.Name + `.Validate(); err != nil {
-			ctx.StatusCode(http.StatusBadRequest)
-			ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + ` : " + err.Error()})
-			return
-		}
-		db := ctx.Values().Get("db").(*sql.DB)
-		if err := req.` + t.Name + `.Update(db); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
-			return
-		}
-		ctx.StatusCode(http.StatusOK)
-		ctx.JSON(req)
+	db := ctx.Values().Get("db").(*sql.DB)
+	if err := req.` + t.Name + `.Create(db); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
+		return
 	}
-	
-	// Get` + t.Name + `s handles the get request to fetch all ` + t.SQLName + `s
-	func Get` + t.Name + `s(ctx iris.Context) {
-		var resp models.` + t.Name + `s
-		db := ctx.Values().Get("db").(*sql.DB)
-		if err := resp.GetAll(db); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Liste des ` + lowerFirst(t.FrenchName) + `s, requête : " + err.Error()})
-			return
-		}
-		ctx.StatusCode(http.StatusOK)
-		ctx.JSON(resp)
+	ctx.StatusCode(http.StatusCreated)
+	ctx.JSON(req)
+}
+
+// Update` + t.Name + ` handles the put request to modify a new ` + t.SQLName + `
+func Update` + t.Name + `(ctx iris.Context) {
+	var req ` + t.SQLName + `Req
+	if err := ctx.ReadJSON(&req); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
+		return
 	}
-	
-	// Delete` + t.Name + ` handles the get request to fetch all ` + t.SQLName + `s
-	func Delete` + t.Name + `(ctx iris.Context) {
-		ID, err := ctx.Params().GetInt64("hID")
-		if err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Suppression de ` + lowerFirst(t.FrenchName) + `, paramètre : " + err.Error()})
-			return
-		}
-		resp := models.` + t.Name + `{ID: ID}
-		db := ctx.Values().Get("db").(*sql.DB)
-		if err := resp.Delete(db); err != nil {
-			ctx.StatusCode(http.StatusInternalServerError)
-			ctx.JSON(jsonError{"Suppression de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
-			return
-		}
-		ctx.StatusCode(http.StatusOK)
-		ctx.JSON(jsonMessage{"Logement supprimé"})
-	}`
+	if err := req.` + t.Name + `.Validate(); err != nil {
+		ctx.StatusCode(http.StatusBadRequest)
+		ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + ` : " + err.Error()})
+		return
+	}
+	db := ctx.Values().Get("db").(*sql.DB)
+	if err := req.` + t.Name + `.Update(db); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
+		return
+	}
+	ctx.StatusCode(http.StatusOK)
+	ctx.JSON(req)
+}
+
+// Get` + t.Name + `s handles the get request to fetch all ` + t.SQLName + `s
+func Get` + t.Name + `s(ctx iris.Context) {
+	var resp models.` + t.Name + `s
+	db := ctx.Values().Get("db").(*sql.DB)
+	if err := resp.GetAll(db); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Liste des ` + lowerFirst(t.FrenchName) + `s, requête : " + err.Error()})
+		return
+	}
+	ctx.StatusCode(http.StatusOK)
+	ctx.JSON(resp)
+}
+
+// Delete` + t.Name + ` handles the get request to fetch all ` + t.SQLName + `s
+func Delete` + t.Name + `(ctx iris.Context) {
+	ID, err := ctx.Params().GetInt64("ID")
+	if err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Suppression de ` + lowerFirst(t.FrenchName) + `, paramètre : " + err.Error()})
+		return
+	}
+	resp := models.` + t.Name + `{ID: ID}
+	db := ctx.Values().Get("db").(*sql.DB)
+	if err := resp.Delete(db); err != nil {
+		ctx.StatusCode(http.StatusInternalServerError)
+		ctx.JSON(jsonError{"Suppression de ` + lowerFirst(t.FrenchName) + `, requête : " + err.Error()})
+		return
+	}
+	ctx.StatusCode(http.StatusOK)
+	ctx.JSON(jsonMessage{"Logement supprimé"})
+}`
 
 	_, err = file.WriteString(content)
 	if err != nil {
@@ -726,13 +743,83 @@ func createTest(t *Table) error {
 	return nil
 }
 
+func addRoutes(t *Table) error {
+	addRouteContent, err := ioutil.ReadFile("./actions/routes.go")
+	if err != nil {
+		return errors.New("Lecture du fichier routes " + err.Error())
+	}
+	idx1 := strings.Index(string(addRouteContent), "userParty :=")
+	if idx1 == -1 {
+		return errors.New("Impossible de trouver userParty")
+	}
+	idx2 := strings.Index(string(addRouteContent[idx1:]), "}")
+	if idx2 == -1 {
+		return errors.New("Impossible de trouver la fin de userParty")
+	}
+
+	return ioutil.WriteFile("./actions/routes.go",
+		[]byte(
+			string(addRouteContent[0:idx1-2])+`  adminParty.Post("/`+
+				toSQL(t.Name)+`", Create`+t.Name+`)
+	adminParty.Put("/`+toSQL(t.Name)+`", Update`+t.Name+`)
+	adminParty.Delete("/`+toSQL(t.Name)+`/{ID}", Delete`+t.Name+")\n\n  "+
+				string(addRouteContent[idx1:idx1+idx2])+
+				"\n\tuserParty.Get(\"/"+toSQL(t.Name)+"s\", Get"+t.Name+"s)\n"+
+				string(addRouteContent[idx1+idx2:])), 0666)
+}
+
+func sqlFieldsCreate(f *Field) (str string) {
+	if f.SQLType == "ID" {
+		return "    " + f.SQLName + " SERIAL PRIMARY KEY"
+	}
+	str = "    " + f.SQLName + " " + f.SQLType
+	if !f.Nullable {
+		str += " NOT NULL"
+	}
+	return str
+}
+
+func createTestTable(t *Table) error {
+	commonsTestsContent, err := ioutil.ReadFile("./actions/commons_test.go")
+	if err != nil {
+		return errors.New("Impossible de lire commons_test.go" + err.Error())
+	}
+	idx0 := strings.Index(string(commonsTestsContent), "`DROP TABLE IF EXISTS")
+	if idx0 == -1 {
+		return errors.New("Impossible de trouver la suppression des tables de test")
+	}
+	idx1 := strings.Index(string(commonsTestsContent[idx0:]), " `);")
+	if idx1 == -1 {
+		return errors.New("Impossible de trouver la fun de suppression des tables de test")
+	}
+	idx2 := strings.Index(string(commonsTestsContent), "queries := []string{")
+	if idx2 == -1 {
+		return errors.New("Impossible de trouver les requêtes de création de table test")
+	}
+	idx3 := strings.Index(string(commonsTestsContent[idx2:]), "	}")
+	if idx3 == -1 {
+		return errors.New("Impossible de trouver la fin des requête dans commons_test")
+	}
+	count := strings.Count(string(commonsTestsContent[idx2:idx2+idx3]), "`CREATE TABLE")
+	var fields []string
+	for _, f := range t.Fields {
+		fields = append(fields, sqlFieldsCreate(&f))
+	}
+	return ioutil.WriteFile("./actions/commons_test.go",
+		[]byte(string(commonsTestsContent[0:idx0+idx1])+", "+t.SQLName+
+			string(commonsTestsContent[idx0+idx1:idx2+idx3])+"\t\t`CREATE table "+t.SQLName+
+			" (\n\t"+strings.Join(fields, ",\n\t")+"\n\t\t);`, // "+strconv.Itoa(count)+
+			" : "+t.SQLName+"\n"+string(commonsTestsContent[idx2+idx3:])), 0666)
+}
+
 func main() {
 	table, err := getFields()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	funcs := []func(*Table) error{createModel, createAction, createTest}
+	funcs := []func(*Table) error{createModel, createAction, createTest,
+		addRoutes, createTestTable}
 	for _, f := range funcs {
 		err = f(table)
 		if err != nil {
