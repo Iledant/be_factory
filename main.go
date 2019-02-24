@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	prompt "github.com/c-bata/go-prompt"
+	"github.com/AlecAivazis/survey"
 )
 
 // TODO: split main.go for more readable file
@@ -29,35 +29,6 @@ type Table struct {
 	FrenchName string
 	SQLName    string
 	Fields     []Field
-}
-
-var fieldsPrompt = []prompt.Suggest{
-	{Text: "ID", Description: "Clé primaire"},
-	{Text: "bigint", Description: "Entier long"},
-	{Text: "int", Description: "Entier classique"},
-	{Text: "boolean", Description: "Booléen"},
-	{Text: "varchar", Description: "Texte de longueur variable"},
-	{Text: "text", Description: "Texte sans limite"},
-	{Text: "double precision", Description: "Double précision de 64 bits"},
-	{Text: "date", Description: "Date"},
-}
-
-var yesNoPrompt = []prompt.Suggest{
-	{Text: "oui", Description: "Null possible"},
-	{Text: "non", Description: "Champ jamais nul"},
-}
-
-func emptyCompleter(in prompt.Document) []prompt.Suggest {
-	s := []prompt.Suggest{}
-	return prompt.FilterHasPrefix(s, in.GetWordBeforeCursor(), true)
-}
-
-func fieldCompleter(in prompt.Document) []prompt.Suggest {
-	return prompt.FilterHasPrefix(fieldsPrompt, in.GetWordBeforeCursor(), true)
-}
-
-func yesNoCompleter(in prompt.Document) []prompt.Suggest {
-	return prompt.FilterHasPrefix(yesNoPrompt, in.GetWordBeforeCursor(), true)
 }
 
 func capitalizeFirst(s string) string {
@@ -97,75 +68,71 @@ func toSQL(s string) (formatted string) {
 	return formatted
 }
 
-func validateField(name string) error {
-	for _, t := range fieldsPrompt {
-		if name == t.Text && name != "varchar" {
-			return nil
+func getFields() (*Table, error) {
+	table := &Table{}
+	var name, frenchName, fieldName, fieldType, length string
+	var fieldNullable bool
+	intValidator := func(val interface{}) error {
+		str, ok := val.(string)
+		if !ok {
+			return errors.New("Chiffre attendu")
 		}
-	}
-	if len(name) >= 7 && name[0:7] == "varchar" {
-		var length int
-		_, err := fmt.Sscanf(name, "varchar(%d)", &length)
-		if err != nil {
-			return errors.New(`varchar doit être suivi de la longueur : varchar(50)`)
+		if _, err := strconv.Atoi(str); err != nil {
+			return errors.New("Chiffre attendu")
 		}
 		return nil
 	}
-	return errors.New("Type de champ non reconnu")
-}
-
-func getFields() (*Table, error) {
-	table := &Table{}
-	table.Name = strings.TrimSpace(prompt.Input("Nom du modèle ? ", emptyCompleter,
-		prompt.OptionPrefixTextColor(prompt.Green)))
-	if table.Name == "" {
-		return nil, errors.New("Nom du modèle vide, arrêt de be_factory")
+	prompt := &survey.Input{
+		Message: "Nom du modèle",
 	}
-	table.Name = capitalizeFirst(table.Name)
+	survey.AskOne(prompt, &name, nil)
+	if name == "" {
+		return nil, errors.New("Impossible d'avoir le nom du modèle")
+	}
+	table.Name = capitalizeFirst(strings.TrimSpace(name))
 	table.SQLName = toSQL(table.Name)
-	for table.FrenchName == "" {
-		table.FrenchName = prompt.Input("Nom français du modèle ? ", emptyCompleter,
-			prompt.OptionPrefixTextColor(prompt.Green))
-		if table.FrenchName == "" {
-			fmt.Println("Le nom français ne peut pas être vide")
-		}
+	prompt = &survey.Input{
+		Message: "Nom du modèle français",
 	}
-	table.FrenchName = capitalizeFirst(table.FrenchName)
+	survey.AskOne(prompt, &frenchName, nil)
+	if frenchName == "" {
+		return nil, errors.New("Impossible d'avoir le nom français")
+	}
+	table.FrenchName = capitalizeFirst(strings.TrimSpace(frenchName))
 	var fields []Field
 	for i := 1; ; i++ {
-		fieldName := prompt.Input("  Nom du champ n°"+strconv.Itoa(i)+" ? ", emptyCompleter,
-			prompt.OptionPrefixTextColor(prompt.Yellow))
+		prompt = &survey.Input{Message: "Nom du champ n°" + strconv.Itoa(i)}
+		survey.AskOne(prompt, &fieldName, nil)
 		if fieldName == "" {
 			break
 		}
-		var fieldType string
-		for {
-			fieldType = prompt.Input("  Type du champ "+fieldName+" ? ", fieldCompleter,
-				prompt.OptionPrefixTextColor(prompt.Yellow))
-			err := validateField(fieldType)
-			if err == nil {
-				break
-			}
-			fmt.Println(err.Error())
+		if fieldName == "ID" && i == 1 {
+			fields = append(fields, Field{Name: "ID", SQLType: "ID", Nullable: false})
+			continue
+
 		}
-		var fieldNullable bool
-		for {
-			nullable := prompt.Input("  Le champ "+fieldName+" peut-il est null ? ", fieldCompleter,
-				prompt.OptionPrefixTextColor(prompt.Yellow))
-			if nullable != "o" && nullable != "O" && nullable != "n" && nullable != "N" && nullable != "oui" && nullable != "non" {
-				fmt.Println("  Oui ou non attendu")
-			} else {
-				fieldNullable = nullable == "o" || nullable == "O" || nullable == "oui"
-				break
-			}
+		fieldTypePrompt := &survey.Select{
+			Message: "Type du champ" + strconv.Itoa(i),
+			Options: []string{"ID", "bigint", "int", "boolean", "varchar", "text", "double precision", "date"},
 		}
+		survey.AskOne(fieldTypePrompt, &fieldType, nil)
+		if fieldType == "varchar" {
+			varcharLengthPrompt := &survey.Input{Message: "Longueur maximale"}
+			survey.AskOne(varcharLengthPrompt, &length, intValidator)
+			fieldType = fieldType + "(" + length + ")"
+		}
+		fieldNullablePrompt := &survey.Confirm{
+			Message: "Champ annulable ?",
+		}
+		survey.AskOne(fieldNullablePrompt, &fieldNullable, nil)
 		fields = append(fields, Field{Name: fieldName, SQLType: fieldType, Nullable: fieldNullable})
 	}
 	if len(fields) == 0 {
-		return nil, errors.New("Aucun champ dans la table, arrêt de be_factory")
+		return nil, errors.New("Aucun champ dans la table")
 	}
 	table.Fields = fields
 	fillFields(table)
+	fmt.Printf("Table : %+v", *table)
 	return table, nil
 }
 
