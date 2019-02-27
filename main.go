@@ -21,13 +21,17 @@ func addRoutes(t *Table) error {
 	if idx2 == -1 {
 		return errors.New("Impossible de trouver la fin de userParty")
 	}
-
+	var batchRoute string
+	if t.Batch {
+		batchRoute = "	adminParty.Post(\"/" + t.SQLName + "s\", Batch" + t.Name + "s)\n"
+	}
+	fmt.Printf("BatchRoute %v", batchRoute)
 	return ioutil.WriteFile("./actions/routes.go",
 		[]byte(
 			string(addRouteContent[0:idx1-2])+`  adminParty.Post("/`+
 				toSQL(t.Name)+`", Create`+t.Name+`)
 	adminParty.Put("/`+toSQL(t.Name)+`", Update`+t.Name+`)
-	adminParty.Delete("/`+toSQL(t.Name)+`/{ID}", Delete`+t.Name+")\n\n  "+
+	adminParty.Delete("/`+toSQL(t.Name)+`/{ID}", Delete`+t.Name+")\n"+batchRoute+"\n  "+
 				string(addRouteContent[idx1:idx1+idx2])+
 				"\n\tuserParty.Get(\"/"+toSQL(t.Name)+"s\", Get"+t.Name+"s)\n"+
 				string(addRouteContent[idx1+idx2:])), 0666)
@@ -56,14 +60,25 @@ func updateCommonsTest(t *Table) error {
 	}
 	count := strings.Count(string(commonsTestsContent[idx2:idx2+idx3]), "`CREATE TABLE")
 	var fields []string
+	var tempFields []string
 	for _, f := range t.Fields {
 		fields = append(fields, f.sqlFieldsCreate())
+		if f.Name != "ID" {
+			tempFields = append(tempFields, f.sqlFieldsCreate())
+		}
+	}
+	var tempSQLName, tempCreateQry string
+	if t.Batch {
+		tempSQLName = " , temp_" + t.SQLName
+		tempCreateQry = "\t\t`CREATE TABLE temp_" + t.SQLName + " (\n\t" +
+			strings.Join(tempFields, ",\n\t") + "\n\t\t);`, // " + strconv.Itoa(count+1) +
+			" : temp_" + t.SQLName + "\n"
 	}
 	return ioutil.WriteFile("./actions/commons_test.go",
-		[]byte(string(commonsTestsContent[0:idx0+idx1])+", "+t.SQLName+
-			string(commonsTestsContent[idx0+idx1:idx2+idx3])+"\t\t`CREATE table "+t.SQLName+
+		[]byte(string(commonsTestsContent[0:idx0+idx1])+", "+t.SQLName+tempSQLName+
+			string(commonsTestsContent[idx0+idx1:idx2+idx3])+"\t\t`CREATE TABLE "+t.SQLName+
 			" (\n\t"+strings.Join(fields, ",\n\t")+"\n\t\t);`, // "+strconv.Itoa(count)+
-			" : "+t.SQLName+"\n"+string(commonsTestsContent[idx2+idx3:])), 0666)
+			" : "+t.SQLName+"\n"+tempCreateQry+string(commonsTestsContent[idx2+idx3:])), 0666)
 }
 
 func main() {

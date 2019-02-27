@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -24,6 +23,7 @@ type Table struct {
 	Name       string
 	FrenchName string
 	SQLName    string
+	Batch      bool
 	Fields     []Field
 }
 
@@ -126,9 +126,10 @@ func getFields() (*Table, error) {
 	if len(fields) == 0 {
 		return nil, errors.New("Aucun champ dans la table")
 	}
+	batchPrompt := &survey.Confirm{Message: "Inclure un import de batch"}
+	survey.AskOne(batchPrompt, &table.Batch, nil)
 	table.Fields = fields
 	table.fillFields()
-	fmt.Printf("Table : %+v", *table)
 	return table, nil
 }
 

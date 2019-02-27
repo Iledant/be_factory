@@ -185,6 +185,53 @@ func createTest(t *Table) error {
 		}
 	}
 	`
+
+	if t.Batch {
+		content += `
+		// testBatch` + t.Name + `s check route is limited to admin and batch import succeeds
+func testBatch` + t.Name + `s(t *testing.T, c *TestContext) {
+	tcc := []TestCase{
+		{Token: c.Config.Users.User.Token,
+			Sent:         []byte(` + "``),\n" +
+			`			RespContains: []string{"Droits administrateur requis"},
+			StatusCode:   http.StatusUnauthorized}, // 0 : user unauthorized
+		{Token: c.Config.Users.Admin.Token,
+			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`),\n" + ` // TODO: code batch with validation error
+			RespContains: []string{"Batch de ` + t.FrenchName + `s, requête : "},
+			StatusCode:   http.StatusInternalServerError}, // 1 : validation error
+		{Token: c.Config.Users.Admin.Token,
+			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`),\n" + ` // TODO: code correct batch
+			RespContains: []string{"Batch de ` + t.FrenchName + `s importé"},
+			StatusCode:   http.StatusOK}, // 2 : ok
+	}
+	for i, tc := range tcc {
+		response := c.E.POST("/api/` + t.SQLName + `s").WithBytes(tc.Sent).
+			WithHeader("Authorization", "Bearer "+tc.Token).Expect()
+		body := string(response.Content)
+		for _, r := range tc.RespContains {
+			if !strings.Contains(body, r) {
+				t.Errorf("Batch` + t.Name + `[%d]\n  ->attendu %s\n  ->reçu: %s", i, r, body)
+			}
+		}
+		status := response.Raw().StatusCode
+		if status != tc.StatusCode {
+			t.Errorf("Batch` + t.Name + `[%d]  ->status attendu %d  ->reçu: %d", i, tc.StatusCode, status)
+		}
+		if status == http.StatusOK {
+			response = c.E.GET("/api/` + t.SQLName + `").
+				WithHeader("Authorization", "Bearer "+tc.Token).Expect()
+			body = string(response.Content)
+			for _, j := range []string{""} { // TODO: checking correct batch content
+				if !strings.Contains(body, j) {
+					t.Errorf("Batch` + t.Name + `[all]\n  ->attendu %s\n  ->reçu: %s", j, body)
+				}
+			}
+		}
+	}
+}
+
+		`
+	}
 	_, err = file.WriteString(content)
 	if err != nil {
 		return errors.New("Erreur d'écriture du fichier action : " + err.Error())

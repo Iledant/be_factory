@@ -19,6 +19,77 @@ func createModel(t *Table) error {
 	}
 	defer file.Close()
 	varName := string(t.Name[0] + 'a' - 'A')
+	var fieldNames []string
+	var setFields []string
+	var dollarVars []string
+	var scanVars []string
+	var stmtVars []string
+	for i, f := range t.Fields {
+		if f.GoName != "ID" {
+			fieldNames = append(fieldNames, f.SQLName)
+			setFields = append(setFields, f.SQLName+"=t."+f.SQLName)
+			dollarVars = append(dollarVars, "$"+strconv.Itoa(i+1))
+			scanVars = append(scanVars, "&"+varName+"."+f.GoName)
+			stmtVars = append(stmtVars, "r."+f.GoName)
+		}
+	}
+	var batchStruct, saveFunc string
+	if t.Batch {
+		batchStruct = "\n// " + t.Name + `Line is used to decode a line of ` + t.Name + ` batch
+type ` + t.Name + `Line struct {
+`
+		for _, f := range t.Fields {
+			if f.Name != "ID" {
+				batchStruct += "  " + f.GoName + ` ` + f.GoType + " `json:\"" + f.GoName + "\"`\n"
+			}
+		}
+		batchStruct += `}
+
+// ` + t.Name + `Batch embeddes an array of ` + t.Name + `Line for json export
+type ` + t.Name + `Batch struct {
+	Lines []` + t.Name + `Line ` + "`json:\"" + t.Name + "\"`\n}\n"
+		saveFunc = `
+	// Save insert a batch of ` + t.Name + `Line into database
+func (` + varName + ` *` + t.Name + `Batch) Save(db *sql.DB) (err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(` + "`INSERT INTO temp_" + t.SQLName + "(" + strings.Join(fieldNames, ",") +
+			" VALUES (" + strings.Join(dollarVars, ",") + ")`)" + `
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range ` + varName + `.Lines {
+		// TODO : fields validation
+		// if r. {
+		//	tx.Rollback()
+		//	return errors.New("Champs incorrects")
+		//}
+		if _, err = stmt.Exec(` + strings.Join(stmtVars, ",") + `); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	_, err = tx.Exec(` + "`UPDATE " + t.SQLName + " SET " + strings.Join(setFields, ",") +
+			" FROM temp_" + t.SQLName + " t WHERE t. = " + t.SQLName + ".`) // TODO add reference fields for updating\n" +
+			`if err != nil {
+		tx.Rollback()
+		return err
+	}
+	_, err = tx.Exec(` + "`INSERT INTO " + t.SQLName + " (" + strings.Join(fieldNames, ",") + `)
+	SELECT ` + strings.Join(fieldNames, ",") + ` from temp_` + t.SQLName + ` 
+	  WHERE  NOT IN (SELECT  from ` + t.SQLName + ")`)// TODO : add reference fields for inserting\n" + `
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
+	return nil
+}`
+
+	}
 	content := `package models
 import (
 	"database/sql"
@@ -35,8 +106,7 @@ type ` + t.Name + ` struct {
 
 // ` + t.Name + `s embeddes an array of ` + t.Name + ` for json export
 type ` + t.Name + `s struct {
-	` + t.Name + `s []` + t.Name + " `json:\"" + t.Name + "\"`" +
-		`}
+	` + t.Name + `s []` + t.Name + " `json:\"" + t.Name + "\"`\n}" + batchStruct + `
 
 // Validate checks if ` + t.Name + `'s fields are correctly filled
 func (` + varName + ` *` + t.Name + `) Validate() error {
@@ -50,16 +120,6 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 // Create insert a new ` + t.Name + ` into database
 func (` + varName + ` *` + t.Name + `) Create(db *sql.DB) (err error) {
 	err = db.QueryRow(` + "`INSERT INTO " + t.SQLName + " ("
-	var fieldNames []string
-	var dollarVars []string
-	var scanVars []string
-	for i, f := range t.Fields {
-		if f.GoName != "ID" {
-			fieldNames = append(fieldNames, f.SQLName)
-			dollarVars = append(dollarVars, "$"+strconv.Itoa(i+1))
-			scanVars = append(scanVars, "&"+varName+"."+f.GoName)
-		}
-	}
 
 	content += strings.Join(fieldNames, ",") + ")\n VALUES(" +
 		strings.Join(dollarVars, ",") + ") RETURNING id`," +
@@ -138,7 +198,7 @@ func (` + varName + ` *` + t.Name + `) Delete(db *sql.DB) (err error) {
 	}
 	return nil
 }
-`
+` + saveFunc
 	_, err = file.WriteString(content)
 	if err != nil {
 		return errors.New("Erreur d'écriture du fichier model : " + err.Error())
