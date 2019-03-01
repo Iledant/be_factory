@@ -23,30 +23,6 @@ func createAction(t *Table) error {
 		return errors.New("Impossible de récupérer le chemin courant " + err.Error())
 	}
 	importPath := strings.Replace(path[len(srcGoPAth)+5:], "\\", "/", -1) + "/models"
-	var batchAction string
-	if t.Batch {
-		batchAction = `
-
-// Batch` + t.Name + `s handle the post request to update and insert a batch of ` + t.SQLName + `s into the database
-func Batch` + t.Name + `s(ctx iris.Context) {
-	var b models.` + t.Name + `Batch
-	if err := ctx.ReadJSON(&b); err != nil {
-		ctx.StatusCode(http.StatusInternalServerError)
-		ctx.JSON(jsonError{"Batch de ` + t.FrenchName + `s, décodage : " + err.Error()})
-		return
-	}
-	db := ctx.Values().Get("db").(*sql.DB)
-	if err := b.Save(db); err != nil {
-		ctx.StatusCode(http.StatusInternalServerError)
-		ctx.JSON(jsonError{"Batch de ` + t.FrenchName + `s, requête : " + err.Error()})
-		return
-	}
-	ctx.StatusCode(http.StatusOK)
-	ctx.JSON(jsonMessage{"Batch de ` + t.FrenchName + `s importé"})
-}
-
-		`
-	}
 	content := `package actions
 
 import (
@@ -60,8 +36,9 @@ import (
 type ` + t.SQLName + `Req struct {
 	` + t.Name + ` models.` + t.Name + ` ` + "`json:\"" + t.Name + "\"`" + `
 }
-
-// Create` + t.Name + ` handles the post request to create a new ` + t.SQLName + `
+`
+	if t.Create {
+		content += `// Create` + t.Name + ` handles the post request to create a new ` + t.SQLName + `
 func Create` + t.Name + `(ctx iris.Context) {
 	var req ` + t.SQLName + `Req
 	if err := ctx.ReadJSON(&req); err != nil {
@@ -83,8 +60,10 @@ func Create` + t.Name + `(ctx iris.Context) {
 	ctx.StatusCode(http.StatusCreated)
 	ctx.JSON(req)
 }
-
-// Update` + t.Name + ` handles the put request to modify a new ` + t.SQLName + `
+`
+	}
+	if t.Update {
+		content += `// Update` + t.Name + ` handles the put request to modify a new ` + t.SQLName + `
 func Update` + t.Name + `(ctx iris.Context) {
 	var req ` + t.SQLName + `Req
 	if err := ctx.ReadJSON(&req); err != nil {
@@ -106,8 +85,10 @@ func Update` + t.Name + `(ctx iris.Context) {
 	ctx.StatusCode(http.StatusOK)
 	ctx.JSON(req)
 }
-
-// Get` + t.Name + `s handles the get request to fetch all ` + t.SQLName + `s
+`
+	}
+	if t.GetAll {
+		content += `// Get` + t.Name + `s handles the get request to fetch all ` + t.SQLName + `s
 func Get` + t.Name + `s(ctx iris.Context) {
 	var resp models.` + t.Name + `s
 	db := ctx.Values().Get("db").(*sql.DB)
@@ -119,8 +100,10 @@ func Get` + t.Name + `s(ctx iris.Context) {
 	ctx.StatusCode(http.StatusOK)
 	ctx.JSON(resp)
 }
-
-// Delete` + t.Name + ` handles the get request to fetch all ` + t.SQLName + `s
+`
+	}
+	if t.Delete {
+		content += `// Delete` + t.Name + ` handles the get request to fetch all ` + t.SQLName + `s
 func Delete` + t.Name + `(ctx iris.Context) {
 	ID, err := ctx.Params().GetInt64("ID")
 	if err != nil {
@@ -137,7 +120,31 @@ func Delete` + t.Name + `(ctx iris.Context) {
 	}
 	ctx.StatusCode(http.StatusOK)
 	ctx.JSON(jsonMessage{"Logement supprimé"})
-}` + batchAction
+}`
+	}
+	if t.Batch {
+		content += `
+
+// Batch` + t.Name + `s handle the post request to update and insert a batch of ` + t.SQLName + `s into the database
+func Batch` + t.Name + `s(ctx iris.Context) {
+var b models.` + t.Name + `Batch
+if err := ctx.ReadJSON(&b); err != nil {
+	ctx.StatusCode(http.StatusInternalServerError)
+	ctx.JSON(jsonError{"Batch de ` + t.FrenchName + `s, décodage : " + err.Error()})
+	return
+}
+db := ctx.Values().Get("db").(*sql.DB)
+if err := b.Save(db); err != nil {
+	ctx.StatusCode(http.StatusInternalServerError)
+	ctx.JSON(jsonError{"Batch de ` + t.FrenchName + `s, requête : " + err.Error()})
+	return
+}
+ctx.StatusCode(http.StatusOK)
+ctx.JSON(jsonMessage{"Batch de ` + t.FrenchName + `s importé"})
+}
+
+	`
+	}
 
 	_, err = file.WriteString(content)
 	if err != nil {

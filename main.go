@@ -21,19 +21,26 @@ func addRoutes(t *Table) error {
 	if idx2 == -1 {
 		return errors.New("Impossible de trouver la fin de userParty")
 	}
-	var batchRoute string
+	var adminContent, userContent string
+	if t.Create {
+		adminContent += "\n\tadminParty.Post(\"/" + toSQL(t.Name) + "\", Create" + t.Name + ")"
+	}
+	if t.Update {
+		adminContent += "\n\tadminParty.Put(\"/" + toSQL(t.Name) + "\", Update" + t.Name + ")"
+	}
+	if t.Delete {
+		adminContent += "\n\tadminParty.Delete(\"/" + toSQL(t.Name) + "/{ID}\", Delete" + t.Name + ")"
+	}
+	if t.GetAll {
+		userContent += "\n\tadminParty.Get(\"/" + toSQL(t.Name) + "s\", Get" + t.Name + "s)"
+	}
 	if t.Batch {
-		batchRoute = "	adminParty.Post(\"/" + t.SQLName + "s\", Batch" + t.Name + "s)\n"
+		adminContent += "\n\tadminParty.Post(\"/" + t.SQLName + "s\", Batch" + t.Name + "s)"
 	}
 	return ioutil.WriteFile("./actions/routes.go",
-		[]byte(
-			string(addRouteContent[0:idx1-2])+`  adminParty.Post("/`+
-				toSQL(t.Name)+`", Create`+t.Name+`)
-	adminParty.Put("/`+toSQL(t.Name)+`", Update`+t.Name+`)
-	adminParty.Delete("/`+toSQL(t.Name)+`/{ID}", Delete`+t.Name+")\n"+batchRoute+"\n  "+
-				string(addRouteContent[idx1:idx1+idx2])+
-				"\n\tuserParty.Get(\"/"+toSQL(t.Name)+"s\", Get"+t.Name+"s)\n"+
-				string(addRouteContent[idx1+idx2:])), 0666)
+		[]byte(string(addRouteContent[0:idx1-2])+adminContent+
+			string(addRouteContent[idx1:idx1+idx2])+userContent+
+			string(addRouteContent[idx1+idx2:])), 0666)
 }
 
 func updateCommonsTest(t *Table) error {
