@@ -25,7 +25,6 @@ func addRoutes(t *Table) error {
 	if t.Batch {
 		batchRoute = "	adminParty.Post(\"/" + t.SQLName + "s\", Batch" + t.Name + "s)\n"
 	}
-	fmt.Printf("BatchRoute %v", batchRoute)
 	return ioutil.WriteFile("./actions/routes.go",
 		[]byte(
 			string(addRouteContent[0:idx1-2])+`  adminParty.Post("/`+

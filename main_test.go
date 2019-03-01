@@ -8,22 +8,8 @@ type strTest struct {
 }
 
 func TestMain(t *testing.T) {
-	testCapitalizeFirst(t)
 	testLowerFirst(t)
 	testToSQL(t)
-}
-
-func testCapitalizeFirst(t *testing.T) {
-	tcc := []strTest{
-		{Send: "Housing", Attended: "Housing"},
-		{Send: "housing", Attended: "Housing"},
-	}
-	for i, tc := range tcc {
-		cap := capitalizeFirst(tc.Send)
-		if cap != tc.Attended {
-			t.Errorf("CapitalizeFirst[%d] : attendu -> %s   reçu -> %s", i, tc.Attended, cap)
-		}
-	}
 }
 
 func testLowerFirst(t *testing.T) {

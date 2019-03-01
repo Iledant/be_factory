@@ -23,15 +23,13 @@ type Table struct {
 	Name       string
 	FrenchName string
 	SQLName    string
+	Create     bool
+	Get        bool
+	GetAll     bool
+	Delete     bool
+	Update     bool
 	Batch      bool
 	Fields     []Field
-}
-
-func capitalizeFirst(s string) string {
-	if s[0] >= 'a' && s[0] <= 'z' {
-		return string(s[0]-'a'+'A') + s[1:]
-	}
-	return s
 }
 
 func lowerFirst(s string) string {
@@ -85,7 +83,7 @@ func getFields() (*Table, error) {
 	if name == "" {
 		return nil, errors.New("Impossible d'avoir le nom du modèle")
 	}
-	table.Name = capitalizeFirst(strings.TrimSpace(name))
+	table.Name = strings.Title(strings.TrimSpace(name))
 	table.SQLName = toSQL(table.Name)
 	prompt = &survey.Input{
 		Message: "Nom du modèle français",
@@ -94,7 +92,7 @@ func getFields() (*Table, error) {
 	if frenchName == "" {
 		return nil, errors.New("Impossible d'avoir le nom français")
 	}
-	table.FrenchName = capitalizeFirst(strings.TrimSpace(frenchName))
+	table.FrenchName = strings.Title(strings.TrimSpace(frenchName))
 	var fields []Field
 	for i := 1; ; i++ {
 		prompt = &survey.Input{Message: "Nom du champ n°" + strconv.Itoa(i)}
@@ -126,8 +124,30 @@ func getFields() (*Table, error) {
 	if len(fields) == 0 {
 		return nil, errors.New("Aucun champ dans la table")
 	}
-	batchPrompt := &survey.Confirm{Message: "Inclure un import de batch"}
-	survey.AskOne(batchPrompt, &table.Batch, nil)
+	// batchPrompt := &survey.Confirm{Message: "Inclure un import de batch"}
+	// survey.AskOne(batchPrompt, &table.Batch, nil)
+	actions := []string{}
+	actionPrompt := &survey.MultiSelect{
+		Message: "Actions à intégrer",
+		Options: []string{"Create", "Update", "Get", "Delete", "GetAll", "Batch"},
+	}
+	survey.AskOne(actionPrompt, &actions, nil)
+	for _, s := range actions {
+		switch s {
+		case "Create":
+			table.Create = true
+		case "Update":
+			table.Update = true
+		case "Get":
+			table.Get = true
+		case "Delete":
+			table.Delete = true
+		case "GetAll":
+			table.GetAll = true
+		case "Batch":
+			table.Batch = true
+		}
+	}
 	table.Fields = fields
 	table.fillFields()
 	return table, nil
@@ -135,7 +155,7 @@ func getFields() (*Table, error) {
 
 func (t *Table) fillFields() {
 	for i, f := range t.Fields {
-		goName := capitalizeFirst(strings.TrimSpace(f.Name))
+		goName := strings.Title(strings.TrimSpace(f.Name))
 		sQLName := toSQL(goName)
 		var goType string
 		switch f.SQLType {

@@ -54,7 +54,7 @@ func createTest(t *Table) error {
 				Token:        c.Config.Users.Admin.Token,
 				RespContains: []string{` + "`" + `Création de ` + lowerFirst(t.FrenchName) + ` : Champ reference incorrect` + "`" + `},
 				StatusCode:   http.StatusBadRequest}, // 2 : TODO validation check
-			{Sent: []byte(` + "`" + `{"` + t.Name + `":{` + jsonFields + `}` + "`" + `),
+			{Sent: []byte(` + "`" + `{"` + t.Name + `":{` + jsonFields + "}}`" + `),
 				Token:        c.Config.Users.Admin.Token,
 				RespContains: []string{` + "`" + `"` + t.Name + `":{"ID":1,` + jsonFields + `` + "`" + `},
 				StatusCode:   http.StatusCreated}, // 3 : ok
@@ -196,12 +196,12 @@ func testBatch` + t.Name + `s(t *testing.T, c *TestContext) {
 			`			RespContains: []string{"Droits administrateur requis"},
 			StatusCode:   http.StatusUnauthorized}, // 0 : user unauthorized
 		{Token: c.Config.Users.Admin.Token,
-			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`),\n" + ` // TODO: code batch with validation error
-			RespContains: []string{"Batch de ` + t.FrenchName + `s, requête : "},
+			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`),\n // TODO: code batch with validation error" +
+			`			RespContains: []string{"Batch de ` + t.FrenchName + `s, requête : "},
 			StatusCode:   http.StatusInternalServerError}, // 1 : validation error
 		{Token: c.Config.Users.Admin.Token,
-			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`),\n" + ` // TODO: code correct batch
-			RespContains: []string{"Batch de ` + t.FrenchName + `s importé"},
+			Sent: []byte(` + "`{\"" + t.Name + "\":[{},{}]}`), // TODO: code correct batch\n" +
+			`			RespContains: []string{"Batch de ` + t.FrenchName + `s importé"},
 			StatusCode:   http.StatusOK}, // 2 : ok
 	}
 	for i, tc := range tcc {
@@ -218,7 +218,7 @@ func testBatch` + t.Name + `s(t *testing.T, c *TestContext) {
 			t.Errorf("Batch` + t.Name + `[%d]  ->status attendu %d  ->reçu: %d", i, tc.StatusCode, status)
 		}
 		if status == http.StatusOK {
-			response = c.E.GET("/api/` + t.SQLName + `").
+			response = c.E.GET("/api/` + t.SQLName + `s").
 				WithHeader("Authorization", "Bearer "+tc.Token).Expect()
 			body = string(response.Content)
 			for _, j := range []string{""} { // TODO: checking correct batch content
