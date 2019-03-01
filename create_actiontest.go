@@ -25,20 +25,33 @@ func createTest(t *Table) error {
 	
 	// test` + t.Name + ` is the entry point for testing all renew projet requests
 	func test` + t.Name + `(t *testing.T, c *TestContext) {
-		t.Run("` + t.Name + `", func(t *testing.T) {
-			ID := testCreate` + t.Name + `(t, c)
+		t.Run("` + t.Name + `", func(t *testing.T) {`
+	if t.Create {
+		content += `			ID := testCreate` + t.Name + `(t, c)
 			if ID == 0 {
 				t.Error("Impossible de créer le ` + lowerFirst(t.FrenchName) + `")
 				t.FailNow()
 				return
 			}
-			testUpdate` + t.Name + `(t, c, ID)
-			testGet` + t.Name + `s(t, c)
-			testDelete` + t.Name + `(t, c, ID)
-		})
+`
 	}
-	
-	// testCreate` + t.Name + ` checks if route is admin protected and created budget action
+	if t.Update {
+		content += "\t\ttestUpdate" + t.Name + "(t, c, ID)\n"
+	}
+	if t.GetAll {
+		content += "\t\ttestGet" + t.Name + "s(t, c)\n"
+	}
+	if t.Delete {
+		content += "\t\ttestDelete" + t.Name + "(t, c, ID)\n"
+	}
+	if t.Batch {
+		content += "\t\ttestBatch" + t.Name + "s(t, c)\n"
+	}
+	content += "\t})\n}\n"
+
+	if t.Create {
+		content += `
+		// testCreate` + t.Name + ` checks if route is admin protected and created budget action
 	// is properly filled
 	func testCreate` + t.Name + `(t *testing.T, c *TestContext) (ID int) {
 		tcc := []TestCase{
@@ -78,8 +91,10 @@ func createTest(t *Table) error {
 		}
 		return ID
 	}
-	
-	// testUpdate` + t.Name + ` checks if route is admin protected and Updated budget action
+`
+	}
+	if t.Update {
+		content += `	// testUpdate` + t.Name + ` checks if route is admin protected and Updated budget action
 	// is properly filled
 	func testUpdate` + t.Name + `(t *testing.T, c *TestContext, ID int) {
 		tcc := []TestCase{
@@ -119,8 +134,10 @@ func createTest(t *Table) error {
 			}
 		}
 	}
-	
-	// testGet` + t.Name + `s checks if route is user protected and ` + t.Name + `s correctly sent back
+`
+	}
+	if t.GetAll {
+		content += `	// testGet` + t.Name + `s checks if route is user protected and ` + t.Name + `s correctly sent back
 	func testGet` + t.Name + `s(t *testing.T, c *TestContext) {
 		tcc := []TestCase{
 			{Token: "",
@@ -153,8 +170,10 @@ func createTest(t *Table) error {
 			}
 		}
 	}
-	
-	// testDelete` + t.Name + ` checks if route is user protected and ` + toSQL(t.Name) + `s correctly sent back
+	`
+	}
+	if t.Delete {
+		content += `	// testDelete` + t.Name + ` checks if route is user protected and ` + toSQL(t.Name) + `s correctly sent back
 	func testDelete` + t.Name + `(t *testing.T, c *TestContext, ID int) {
 		tcc := []TestCase{
 			{Token: c.Config.Users.User.Token,
@@ -185,7 +204,7 @@ func createTest(t *Table) error {
 		}
 	}
 	`
-
+	}
 	if t.Batch {
 		content += `
 		// testBatch` + t.Name + `s check route is limited to admin and batch import succeeds
@@ -229,8 +248,7 @@ func testBatch` + t.Name + `s(t *testing.T, c *TestContext) {
 		}
 	}
 }
-
-		`
+`
 	}
 	_, err = file.WriteString(content)
 	if err != nil {

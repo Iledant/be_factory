@@ -48,6 +48,14 @@ func updateCommonsTest(t *Table) error {
 	if err != nil {
 		return errors.New("Impossible de lire commons_test.go" + err.Error())
 	}
+	idxTestAll := strings.Index(string(commonsTestsContent), "func TestAll(t *testing.T) {")
+	if idxTestAll == -1 {
+		return errors.New("Impossible de trouver la fonction TestAll")
+	}
+	idxEndTestAll := strings.Index(string(commonsTestsContent[idxTestAll:]), "}")
+	if idxEndTestAll == -1 {
+		return errors.New("Impossible de trouver la fin de la fonction TestAll")
+	}
 	idx0 := strings.Index(string(commonsTestsContent), "`DROP TABLE IF EXISTS")
 	if idx0 == -1 {
 		return errors.New("Impossible de trouver la suppression des tables de test")
@@ -81,7 +89,8 @@ func updateCommonsTest(t *Table) error {
 			" : temp_" + t.SQLName + "\n"
 	}
 	return ioutil.WriteFile("./actions/commons_test.go",
-		[]byte(string(commonsTestsContent[0:idx0+idx1])+", "+t.SQLName+tempSQLName+
+		[]byte(string(commonsTestsContent[0:idxTestAll+idxEndTestAll])+"\n\ttest"+t.Name+"(t, cfg)\n"+
+			string(commonsTestsContent[idxTestAll+idxEndTestAll:idx0+idx1])+", "+t.SQLName+tempSQLName+
 			string(commonsTestsContent[idx0+idx1:idx2+idx3])+"\t\t`CREATE TABLE "+t.SQLName+
 			" (\n\t"+strings.Join(fields, ",\n\t")+"\n\t\t);`, // "+strconv.Itoa(count)+
 			" : "+t.SQLName+"\n"+tempCreateQry+string(commonsTestsContent[idx2+idx3:])), 0666)
