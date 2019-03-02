@@ -34,7 +34,7 @@ main.go
     ...
 ```
 
-Common_test.go is used to configure the test database, deleting tables created in the previous unit test sequence and creating new ones. Table are empty and unit tests sequences is designed to create a new row, update it, get all rows and finally to delete it.
+`common_test.go` is used to configure the test database, deleting tables created in the previous unit test sequence and creating new ones. Table are empty and unit tests sequences is designed to create a new row, update it, get all rows and finally to delete it.
 
 Be Factory scan `routes.go`, `common_test.go` in order to find good location to insert the generated code i.e. new routes, test table deleting and creating, test functions calls.
 
@@ -44,9 +44,9 @@ Be Factory checks if `/models` and `/routes` directories exist, tries to create 
 
 Be Factory asks the user informations i.e.
 
-* Name of the model. That name is used as go type in the model file. It's must be camel cased
+* Name of the model. That name is used as go type in the model file
 
-* French name. It is used in the error messages sent backs par action functions.
+* French name. It is used in the error messages sent backs par action functions
 
 * Fields descriptions i.e.
 
@@ -58,8 +58,15 @@ Be Factory asks the user informations i.e.
 
 * Actions that must be codded. The possible choices are create, update, get all, get, delete and batch
 
+The different naming convention is the following one :
+
+* Name of the model must be capitalized for example FinancialCommitment. The model name is used for function names for example CreateFinancialCommitment. Be Factory use the `title` go strings package function to ensure that the first letter of the model name is capitalized
+
+* Name of the SQL table must be kebab cased for example financial_commitment. The table name is also used for the file name for example financial_commitment.go in the action and models folders
+
+
 ## Known bugs
 
-Be Factory is used to generate a quick and almost finalized code for REST API. Some TODOs comment are inserted in the generated code for the parts that must be checked or completed, for example validation or some unit tests.
+Be Factory is used to generate a quick and almost finalized code for REST API. Some TODO comments are inserted in the generated code for the parts that must be checked or completed, for example validation or some unit tests.
 
 Be Factory don't check coherence between chosen actions : for example if the create action is not used, the delete test will be codded as if the ID of the previously created item is available.
