@@ -78,21 +78,25 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 }
 `
 	if t.Create {
-		content += `// Create insert a new ` + t.Name + ` into database
-func (` + varName + ` *` + t.Name + `) Create(db *sql.DB) (err error) {
-	err = db.QueryRow(` + "`INSERT INTO " + t.SQLName + " ("
-
-		content += strings.Join(fieldNames, ",") + ")\n VALUES(" +
+		content += "// Create insert a new " + t.Name + " into database\n" +
+			"func (" + varName + " *" + t.Name + ") Create(db *sql.DB) (err error) {\n" +
+			"\terr = db.QueryRow(`INSERT INTO " + t.SQLName + " (" +
+			strings.Join(fieldNames, ",") + ")\n VALUES(" +
 			strings.Join(dollarVars, ",") + ") RETURNING id`," +
-			strings.Join(scanVars, ",") + `).Scan(&` + varName + `.ID)
-	return err
-}
-`
+			strings.Join(scanVars, ",") + `).Scan(&` + varName + ".ID)\n\treturn err\n}\n"
+	}
+	if t.Get {
+		fieldNames = nil
+		for _, f := range t.Fields {
+			fieldNames = append(fieldNames, f.SQLName)
+		}
+		content += `// Get fetches a ` + t.Name + ` from database` +
+			"func (" + varName + " *" + t.Name + ") Get  (db*sql.DB) (err error) {\n" +
+			"\terr = db.QueryRow(`GET " + strings.Join(fieldNames, ", ") + " FROM " +
+			t.SQLName + " WHERE ID=$1`, " + varName + ".ID).Scan(" + strings.Join(scanVars, ", ") +
+			")\n\tif err!=nil{\n\t\t return err\n\t}\n\treturn nil\n}\n"
 	}
 	if t.Update {
-		content += `// Update modifies a ` + t.SQLName + ` in database
-func (` + varName + ` *` + t.Name + `) Update(db *sql.DB) (err error) {
-	res, err := db.Exec(` + "`UPDATE " + t.SQLName + " SET "
 		fieldNames = nil
 		scanVars = nil
 		i = 1
@@ -103,21 +107,14 @@ func (` + varName + ` *` + t.Name + `) Update(db *sql.DB) (err error) {
 				i++
 			}
 		}
-		content += strings.Join(fieldNames, ",") + " WHERE id=$" + strconv.Itoa(i) +
-			"`,\n" + strings.Join(scanVars, ",") + "," + varName + ".ID)\n" +
-			`  if err != nil {
-		return err
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count != 1 {
-		return errors.New("` + t.FrenchName + ` introuvable")
-	}
-	return err
-}
-`
+		content += "// Update modifies a " + t.SQLName + " in database\n" +
+			"func (" + varName + " *" + t.Name + ") Update(db *sql.DB) (err error) {\n" +
+			"\tres, err := db.Exec(`UPDATE " + t.SQLName + " SET " +
+			strings.Join(fieldNames, ",") + " WHERE id=$" + strconv.Itoa(i) + "`,\n" +
+			strings.Join(scanVars, ",") + "," + varName + ".ID)\n\tif err != nil {\n" +
+			"\t\treturn err\n\t}\tcount, err := res.RowsAffected()\n\tif err != nil {\n" +
+			"\t\treturn err\n\t}\n\tif count != 1 {\n\t\treturn errors.New(\"" +
+			t.FrenchName + " introuvable\")\n\t}\n\treturn err\n}\n"
 	}
 	if t.GetAll {
 		content += `// GetAll fetches all ` + t.Name + `s from database
@@ -169,6 +166,16 @@ func (` + varName + ` *` + t.Name + `) Delete(db *sql.DB) (err error) {
 	}
 
 	if t.Batch {
+		fieldNames = nil
+		dollarVars = nil
+		i = 1
+		for _, f := range t.Fields {
+			if f.GoName != "ID" {
+				fieldNames = append(fieldNames, f.SQLName)
+				dollarVars = append(dollarVars, "$"+strconv.Itoa(i))
+				i++
+			}
+		}
 		content += `
 	// Save insert a batch of ` + t.Name + `Line into database
 func (` + varName + ` *` + t.Name + `Batch) Save(db *sql.DB) (err error) {

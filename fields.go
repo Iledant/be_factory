@@ -107,7 +107,8 @@ func getFields() (*Table, error) {
 		}
 		fieldTypePrompt := &survey.Select{
 			Message: "Type du champ" + strconv.Itoa(i),
-			Options: []string{"ID", "bigint", "int", "boolean", "varchar", "text", "double precision", "date"},
+			Options: []string{"ID", "varchar", "bigint", "int", "date", "boolean",
+				"text", "double precision"},
 		}
 		survey.AskOne(fieldTypePrompt, &fieldType, nil)
 		if fieldType == "varchar" {
