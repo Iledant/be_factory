@@ -91,7 +91,7 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 			fieldNames = append(fieldNames, f.SQLName)
 		}
 		content += `// Get fetches a ` + t.Name + ` from database using ID field` +
-			"func (" + varName + " *" + t.Name + ") Get  (db*sql.DB) (err error) {\n" +
+			"\nfunc (" + varName + " *" + t.Name + ") Get  (db*sql.DB) (err error) {\n" +
 			"\terr = db.QueryRow(`GET " + strings.Join(fieldNames, ", ") + " FROM " +
 			t.SQLName + " WHERE ID=$1`, " + varName + ".ID).Scan(" + strings.Join(scanVars, ", ") +
 			")\n\tif err!=nil{\n\t\t return err\n\t}\n\treturn nil\n}\n"
@@ -112,9 +112,9 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 			"\tres, err := db.Exec(`UPDATE " + t.SQLName + " SET " +
 			strings.Join(fieldNames, ",") + " WHERE id=$" + strconv.Itoa(i) + "`,\n" +
 			strings.Join(scanVars, ",") + "," + varName + ".ID)\n\tif err != nil {\n" +
-			"\t\treturn err\n\t}\tcount, err := res.RowsAffected()\n\tif err != nil {\n" +
+			"\t\treturn err\n\t}\n\tcount, err := res.RowsAffected()\n\tif err != nil {\n" +
 			"\t\treturn err\n\t}\n\tif count != 1 {\n\t\treturn errors.New(\"" +
-			t.FrenchName + " introuvable\")\n\t}\n\treturn err\n}\n"
+			t.FrenchName + " introuvable\")\n\t}\n\treturn err\n}\n\n"
 	}
 	if t.GetAll {
 		content += `// GetAll fetches all ` + t.Name + `s from database

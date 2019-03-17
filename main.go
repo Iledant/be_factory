@@ -31,15 +31,18 @@ func addRoutes(t *Table) error {
 	if t.Delete {
 		adminContent += "\n\tadminParty.Delete(\"/" + toSQL(t.Name) + "/{ID}\", Delete" + t.Name + ")"
 	}
+	if t.Get {
+		userContent += "\n\tuserParty.Get(\"/" + toSQL(t.Name) + "/{ID}\", Get" + t.Name + ")"
+	}
 	if t.GetAll {
-		userContent += "\n\tadminParty.Get(\"/" + toSQL(t.Name) + "s\", Get" + t.Name + "s)"
+		userContent += "\n\tuserParty.Get(\"/" + toSQL(t.Name) + "s\", Get" + t.Name + "s)"
 	}
 	if t.Batch {
 		adminContent += "\n\tadminParty.Post(\"/" + t.SQLName + "s\", Batch" + t.Name + "s)"
 	}
 	return ioutil.WriteFile("./actions/routes.go",
-		[]byte(string(addRouteContent[0:idx1-2])+adminContent+
-			string(addRouteContent[idx1:idx1+idx2])+userContent+
+		[]byte(string(addRouteContent[0:idx1-2])+adminContent+"\n"+
+			string(addRouteContent[idx1:idx1+idx2])+userContent+"\n"+
 			string(addRouteContent[idx1+idx2:])), 0666)
 }
 

@@ -33,14 +33,15 @@ import (
 	"github.com/kataras/iris"
 )
 
-type ` + t.SQLName + `Req struct {
+// ` + t.Name + `Req is used to embed a` + t.Name + ` for requests
+type ` + t.Name + `Req struct {
 	` + t.Name + ` models.` + t.Name + ` ` + "`json:\"" + t.Name + "\"`" + `
 }
 `
 	if t.Create {
 		content += `// Create` + t.Name + ` handles the post request to create a new ` + t.SQLName + `
 func Create` + t.Name + `(ctx iris.Context) {
-	var req ` + t.SQLName + `Req
+	var req ` + t.Name + `Req
 	if err := ctx.ReadJSON(&req); err != nil {
 		ctx.StatusCode(http.StatusInternalServerError)
 		ctx.JSON(jsonError{"Création de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
@@ -65,7 +66,7 @@ func Create` + t.Name + `(ctx iris.Context) {
 	if t.Update {
 		content += `// Update` + t.Name + ` handles the put request to modify a new ` + t.SQLName + `
 func Update` + t.Name + `(ctx iris.Context) {
-	var req ` + t.SQLName + `Req
+	var req ` + t.Name + `Req
 	if err := ctx.ReadJSON(&req); err != nil {
 		ctx.StatusCode(http.StatusInternalServerError)
 		ctx.JSON(jsonError{"Modification de ` + lowerFirst(t.FrenchName) + `, décodage : " + err.Error()})
@@ -89,11 +90,15 @@ func Update` + t.Name + `(ctx iris.Context) {
 	}
 	if t.Get {
 		content += "// Get" + t.Name + " handles the get request to fetch a " + t.SQLName + "\n" +
-			"func Get" + t.Name + "ctx iris.Content) {\n\tvar resp " + t.Name + "Req\n" +
-			"\tdb := ctx.Values().Get(\"db\").(*sql.DB)\n\tif err := resp.Get(db); err != nil {\n" +
+			"func Get" + t.Name + "(ctx iris.Context) {\n\tvar resp " + t.Name + "Req\n" +
+			"\tID, err := ctx.Params().GetInt64(\"ID\")\n\tif err != nil {\n\t\t" +
+			"ctx.StatusCode(http.StatusInternalServerError)\n\t\t" +
+			"ctx.JSON(jsonError{\"Récupération de " + lowerFirst(t.FrenchName) + ", paramètre : \" + err.Error()})\n\t\t" +
+			"return\n\t}\nvar resp " + t.Name + "Req\n\tresp." + t.Name + ".ID = ID\n" +
+			"\tdb := ctx.Values().Get(\"db\").(*sql.DB)\n\tif err := resp." + t.Name + ".Get(db); err != nil {\n" +
 			"\t\tctx.StatusCode(http.StatusInternalServerError)\n" +
 			"\t\tctx.JSON(jsonError{\"Récupération de " + lowerFirst(t.FrenchName) +
-			", requête : \" + err.Error())\n\treturn\n}\n+\tctx.StatusCode(http.StatusOK)\n" +
+			", requête : \" + err.Error()})\n\treturn\n}\n\tctx.StatusCode(http.StatusOK)\n" +
 			"\tctx.JSON(resp)\n}\n"
 	}
 	if t.GetAll {

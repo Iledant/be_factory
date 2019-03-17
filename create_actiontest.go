@@ -151,10 +151,9 @@ func createTest(t *Table) error {
 				StatusCode:   http.StatusInternalServerError,
 				RespContains: []string{` + "`" + `Récupération de ` + lowerFirst(t.FrenchName) +
 			`, requête :` + "`" + `},
-				ID:        0,
-				StatusCode:   http.StatusOK}, // 1 : bad ID
+				ID:        0}, // 1 : bad ID
 			{Token: c.Config.Users.User.Token,
-				RespContains: []string{` + "`" + `{"` + t.Name + "\":[{\"ID\":` + strconv.Itoa(ID)+ `," + modJSONFields + `}]}` + "`" + `},
+				RespContains: []string{` + "`" + `{"` + t.Name + "\":{\"ID\":` + strconv.Itoa(ID)+ `," + modJSONFields + `}}` + "`" + `},
 				ID:        ID,
 				StatusCode:   http.StatusOK}, // 2 : ok
 		}
