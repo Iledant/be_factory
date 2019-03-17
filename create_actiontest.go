@@ -38,6 +38,9 @@ func createTest(t *Table) error {
 	if t.Update {
 		content += "\t\ttestUpdate" + t.Name + "(t, c, ID)\n"
 	}
+	if t.Get {
+		content += "\t\ttestGet" + t.Name + "(t, c, ID)\n"
+	}
 	if t.GetAll {
 		content += "\t\ttestGet" + t.Name + "s(t, c)\n"
 	}
@@ -135,6 +138,42 @@ func createTest(t *Table) error {
 		}
 	}
 `
+	}
+	if t.Get {
+		content += `	// testGet` + t.Name + ` checks if route is user protected and ` + t.Name + ` correctly sent back
+	func testGet` + t.Name + `(t *testing.T, c *TestContext, ID int) {
+		tcc := []TestCase{
+			{Token: "",
+				RespContains: []string{` + "`" + `Token absent` + "`" + `},
+				ID:        0,
+				StatusCode:   http.StatusInternalServerError}, // 0 : token empty
+			{Token: c.Config.Users.User.Token,
+				StatusCode:   http.StatusInternalServerError,
+				RespContains: []string{` + "`" + `Récupération de ` + lowerFirst(t.FrenchName) +
+			`, requête :` + "`" + `},
+				ID:        0,
+				StatusCode:   http.StatusOK}, // 1 : bad ID
+			{Token: c.Config.Users.User.Token,
+				RespContains: []string{` + "`" + `{"` + t.Name + "\":[{\"ID\":` + strconv.Itoa(ID)+ `," + modJSONFields + `}]}` + "`" + `},
+				ID:        ID,
+				StatusCode:   http.StatusOK}, // 2 : ok
+		}
+		for i, tc := range tcc {
+			response := c.E.GET("/api/` + toSQL(t.Name) + `/"+ strconv.Itoa(ID)).
+				WithHeader("Authorization", "Bearer "+tc.Token).Expect()
+			body := string(response.Content)
+			for _, r := range tc.RespContains {
+				if !strings.Contains(body, r) {
+					t.Errorf("Get` + t.Name + `[%d]\n  ->attendu %s\n  ->reçu: %s", i, r, body)
+				}
+			}
+			status := response.Raw().StatusCode
+			if status != tc.StatusCode {
+				t.Errorf("Get` + t.Name + `[%d]  ->status attendu %d  ->reçu: %d", i, tc.StatusCode, status)
+			}
+		}
+	}
+	`
 	}
 	if t.GetAll {
 		content += `	// testGet` + t.Name + `s checks if route is user protected and ` + t.Name + `s correctly sent back

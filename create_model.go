@@ -90,7 +90,7 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 		for _, f := range t.Fields {
 			fieldNames = append(fieldNames, f.SQLName)
 		}
-		content += `// Get fetches a ` + t.Name + ` from database` +
+		content += `// Get fetches a ` + t.Name + ` from database using ID field` +
 			"func (" + varName + " *" + t.Name + ") Get  (db*sql.DB) (err error) {\n" +
 			"\terr = db.QueryRow(`GET " + strings.Join(fieldNames, ", ") + " FROM " +
 			t.SQLName + " WHERE ID=$1`, " + varName + ".ID).Scan(" + strings.Join(scanVars, ", ") +

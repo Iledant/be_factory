@@ -87,6 +87,15 @@ func Update` + t.Name + `(ctx iris.Context) {
 }
 `
 	}
+	if t.Get {
+		content += "// Get" + t.Name + " handles the get request to fetch a " + t.SQLName + "\n" +
+			"func Get" + t.Name + "ctx iris.Content) {\n\tvar resp " + t.Name + "Req\n" +
+			"\tdb := ctx.Values().Get(\"db\").(*sql.DB)\n\tif err := resp.Get(db); err != nil {\n" +
+			"\t\tctx.StatusCode(http.StatusInternalServerError)\n" +
+			"\t\tctx.JSON(jsonError{\"Récupération de " + lowerFirst(t.FrenchName) +
+			", requête : \" + err.Error())\n\treturn\n}\n+\tctx.StatusCode(http.StatusOK)\n" +
+			"\tctx.JSON(resp)\n}\n"
+	}
 	if t.GetAll {
 		content += `// Get` + t.Name + `s handles the get request to fetch all ` + t.SQLName + `s
 func Get` + t.Name + `s(ctx iris.Context) {
