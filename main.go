@@ -42,7 +42,7 @@ func addRoutes(t *Table) error {
 	}
 	return ioutil.WriteFile("./actions/routes.go",
 		[]byte(string(addRouteContent[0:idx1-2])+adminContent+"\n"+
-			string(addRouteContent[idx1:idx1+idx2])+userContent+"\n"+
+			string(addRouteContent[idx1-2:idx1+idx2])+userContent+"\n"+
 			string(addRouteContent[idx1+idx2:])), 0666)
 }
 

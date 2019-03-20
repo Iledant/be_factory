@@ -153,7 +153,7 @@ func createTest(t *Table) error {
 			`, requête :` + "`" + `},
 				ID:        0}, // 1 : bad ID
 			{Token: c.Config.Users.User.Token,
-				RespContains: []string{` + "`" + `{"` + t.Name + "\":{\"ID\":` + strconv.Itoa(ID)+ `," + modJSONFields + `}}` + "`" + `},
+				RespContains: []string{` + "`" + `{"` + t.Name + "\":{\"ID\":` + strconv.Itoa(tc.ID)+ `," + modJSONFields + `}}` + "`" + `},
 				ID:        ID,
 				StatusCode:   http.StatusOK}, // 2 : ok
 		}
@@ -222,7 +222,7 @@ func createTest(t *Table) error {
 				ID:           0,
 				StatusCode:   http.StatusInternalServerError}, // 1 : bad ID
 			{Token: c.Config.Users.Admin.Token,
-				RespContains: []string{` + "`" + `Logement supprimé` + "`" + `},
+				RespContains: []string{` + "`" + t.FrenchName + ` supprimé` + "`" + `},
 				ID:           ID,
 				StatusCode:   http.StatusOK}, // 2 : ok
 		}

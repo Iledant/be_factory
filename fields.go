@@ -241,9 +241,9 @@ func mockField(goType string, modified bool) string {
 		return "1.5"
 	case "time.Time":
 		if modified {
-			return "2018-04-02T00:00:00"
+			return "\"2018-04-02T00:00:00Z\""
 		}
-		return "2019-03-01T00:00:00"
+		return "\"2019-03-01T00:00:00Z\""
 	case "NullInt64":
 		if modified {
 			return "null"
@@ -268,7 +268,7 @@ func mockField(goType string, modified bool) string {
 		if modified {
 			return "null"
 		}
-		return "2019-03-01T00:00:00"
+		return "\"2019-03-01T00:00:00Z\""
 	}
 	if modified {
 		return "\"Essai2\""

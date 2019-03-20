@@ -92,7 +92,7 @@ func (` + varName + ` *` + t.Name + `) Validate() error {
 		}
 		content += `// Get fetches a ` + t.Name + ` from database using ID field` +
 			"\nfunc (" + varName + " *" + t.Name + ") Get  (db*sql.DB) (err error) {\n" +
-			"\terr = db.QueryRow(`GET " + strings.Join(fieldNames, ", ") + " FROM " +
+			"\terr = db.QueryRow(`SELECT " + strings.Join(fieldNames, ", ") + " FROM " +
 			t.SQLName + " WHERE ID=$1`, " + varName + ".ID).Scan(" + strings.Join(scanVars, ", ") +
 			")\n\tif err!=nil{\n\t\t return err\n\t}\n\treturn nil\n}\n"
 	}

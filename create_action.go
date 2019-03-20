@@ -90,11 +90,11 @@ func Update` + t.Name + `(ctx iris.Context) {
 	}
 	if t.Get {
 		content += "// Get" + t.Name + " handles the get request to fetch a " + t.SQLName + "\n" +
-			"func Get" + t.Name + "(ctx iris.Context) {\n\tvar resp " + t.Name + "Req\n" +
+			"func Get" + t.Name + "(ctx iris.Context) {\n" +
 			"\tID, err := ctx.Params().GetInt64(\"ID\")\n\tif err != nil {\n\t\t" +
 			"ctx.StatusCode(http.StatusInternalServerError)\n\t\t" +
 			"ctx.JSON(jsonError{\"Récupération de " + lowerFirst(t.FrenchName) + ", paramètre : \" + err.Error()})\n\t\t" +
-			"return\n\t}\nvar resp " + t.Name + "Req\n\tresp." + t.Name + ".ID = ID\n" +
+			"return\n\t}\n\tvar resp " + t.Name + "Req\n\tresp." + t.Name + ".ID = ID\n" +
 			"\tdb := ctx.Values().Get(\"db\").(*sql.DB)\n\tif err := resp." + t.Name + ".Get(db); err != nil {\n" +
 			"\t\tctx.StatusCode(http.StatusInternalServerError)\n" +
 			"\t\tctx.JSON(jsonError{\"Récupération de " + lowerFirst(t.FrenchName) +
@@ -133,7 +133,7 @@ func Delete` + t.Name + `(ctx iris.Context) {
 		return
 	}
 	ctx.StatusCode(http.StatusOK)
-	ctx.JSON(jsonMessage{"Logement supprimé"})
+	ctx.JSON(jsonMessage{"` + t.FrenchName + ` supprimé"})
 }`
 	}
 	if t.Batch {
