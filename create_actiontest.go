@@ -153,12 +153,12 @@ func createTest(t *Table) error {
 			`, requête :` + "`" + `},
 				ID:        0}, // 1 : bad ID
 			{Token: c.Config.Users.User.Token,
-				RespContains: []string{` + "`" + `{"` + t.Name + "\":{\"ID\":` + strconv.Itoa(tc.ID)+ `," + modJSONFields + `}}` + "`" + `},
+				RespContains: []string{` + "`" + `{"` + t.Name + "\":{\"ID\":` + strconv.Itoa(ID)+ `," + modJSONFields + `}}` + "`" + `},
 				ID:        ID,
 				StatusCode:   http.StatusOK}, // 2 : ok
 		}
 		for i, tc := range tcc {
-			response := c.E.GET("/api/` + toSQL(t.Name) + `/"+ strconv.Itoa(ID)).
+			response := c.E.GET("/api/` + toSQL(t.Name) + `/"+ strconv.Itoa(tc.ID)).
 				WithHeader("Authorization", "Bearer "+tc.Token).Expect()
 			body := string(response.Content)
 			for _, r := range tc.RespContains {
