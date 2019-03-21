@@ -17,7 +17,7 @@ func addRoutes(t *Table) error {
 	if idx1 == -1 {
 		return errors.New("Impossible de trouver userParty")
 	}
-	idx2 := strings.Index(string(addRouteContent[idx1:]), "}")
+	idx2 := strings.Index(string(addRouteContent[idx1:]), "\n}")
 	if idx2 == -1 {
 		return errors.New("Impossible de trouver la fin de userParty")
 	}
@@ -42,7 +42,7 @@ func addRoutes(t *Table) error {
 	}
 	return ioutil.WriteFile("./actions/routes.go",
 		[]byte(string(addRouteContent[0:idx1-2])+adminContent+"\n"+
-			string(addRouteContent[idx1-2:idx1+idx2])+userContent+"\n"+
+			string(addRouteContent[idx1-2:idx1+idx2])+userContent+
 			string(addRouteContent[idx1+idx2:])), 0666)
 }
 
@@ -105,8 +105,9 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	funcs := []func(*Table) error{createModel, createAction, createTest,
-		addRoutes, updateCommonsTest}
+	funcs := []func(*Table) error{ //createModel, createAction, createTest,
+		addRoutes, // updateCommonsTest
+	}
 	for _, f := range funcs {
 		err = f(table)
 		if err != nil {
