@@ -22,6 +22,7 @@ func addRoutes(t *Table) error {
 		return errors.New("Impossible de trouver la fin de userParty")
 	}
 	var adminContent, userContent string
+	userContent = "\n"
 	if t.Create {
 		adminContent += "\n\tadminParty.Post(\"/" + toSQL(t.Name) + "\", Create" + t.Name + ")"
 	}
@@ -105,9 +106,8 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	funcs := []func(*Table) error{ //createModel, createAction, createTest,
-		addRoutes, // updateCommonsTest
-	}
+	funcs := []func(*Table) error{createModel, createAction, createTest,
+		addRoutes, updateCommonsTest}
 	for _, f := range funcs {
 		err = f(table)
 		if err != nil {
